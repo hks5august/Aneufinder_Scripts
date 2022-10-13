@@ -1,0 +1,917 @@
+#load libraries
+library(AneuFinder)
+library(BSgenome.Hsapiens.UCSC.hg19)
+
+#set seed
+set.seed(7)
+
+#define path
+path <- "/Users/kaurh8/Documents/Tofilon_SC_data/Aneufinder_Dedupp_GC/Complete_output_50k_GC/MODELS/method-edivisive"
+#path <- "/Users/kaurh8/Documents/Tofilon_SC_data/sorted_bam/Complete_output_5k/MODELS/method-edivisive/"
+
+#set path
+setwd(path)
+
+#list models in files 
+files <- list.files(path=path, pattern=".RData")
+files 
+
+
+#store models for control/Vehicle
+files.Veh <- grep("Veh", files, ignore.case=TRUE, value=TRUE/FALSE)
+files.Veh
+
+#store models for CFI (TTK inhibitor)
+files.CFI <- grep("CFI", files, ignore.case=TRUE, value=TRUE/FALSE)
+files.CFI
+
+#Cluster by quality
+cl <- clusterByQuality(files, measures=c('spikiness','num.segments','entropy','bhattacharyya','sos'))
+
+#Quality plot
+QC_plot <- plot(cl$Mclust, what='classification')
+QC_plot
+
+#Save Quality control plot in JPEG
+jpeg(file="ClusterQuality_plot_plot.jpeg", units="in", width=10, height=10, res=350)
+QC_plot
+dev.off()
+
+#Genomewide Heatmap without and with clusters
+cl
+cl$classification
+#take cluster results based on classification. Note: here, one can also focussed on specific cluster
+selected.files <- unlist(cl$classification[1:8])
+
+selected.files
+Heat_G <- heatmapGenomewide(selected.files)
+Heat_G
+
+#create Simple samples labels
+Sample_Labels <- sapply(strsplit(selected.files,"_FKDN"), getElement, 1)
+Sample_Labels
+
+#Draw heatmap without clusters 
+Heat_G <- heatmapGenomewide(selected.files, cluster = F, ylabels = Sample_Labels)
+Heat_G
+
+jpeg(file="Genome_Wide_Heatmap.jpeg", units="in", width=35, height=20, res=350)
+Heat_G
+dev.off()
+
+
+jpeg(file="Genome_Wide_Heatmap1.jpeg", units="in", width=30, height=15, res=350)
+Heat_G
+dev.off()
+
+
+pdf(file="Genome_Wide_Heatmap.pdf", width = 30, height = 15)
+Heat_G
+dev.off()
+
+#Draw heatmap with clusters 
+
+Heat_G_with_clus <- heatmapGenomewide(selected.files, cluster = T, ylabels = Sample_Labels)
+Heat_G_with_clus 
+
+jpeg(file="GenomeWide_Heatmap_with_Clusters.jpeg", units="in", width=35, height=15, res=350)
+Heat_G_with_clus 
+dev.off()
+
+pdf(file="GenomeWide_Heatmap_with_Clusters.pdf",  width=35, height=15)
+Heat_G_with_clus 
+dev.off()
+
+#PCA plots
+results <- sapply(files, function(x) mget(load(x)), simplify = TRUE) 
+results 
+plot_pca(results )
+
+classes1 <- c(rep('CFI', length(files.CFI)), rep('Veh', length(files.Veh)))
+classes1 
+
+plot_pca(results, colorBy=classes1, PC1=1, PC2=2)
+pca_res <- as.data.frame(plot_pca(results, colorBy=classes1, PC1=1, PC2=2, plot = F))
+pca_res
+
+#Save PCA plot
+jpeg(file="PCA_plot.jpeg", units="in", width=10, height=10, res=350)
+plot_pca(results, colorBy=classes1, PC1=1, PC2=2)
+dev.off()
+
+#Save PCA plot (color based on sample labels)
+jpeg(file="Ex_PCA_Sample_labelled.jpeg", units="in", width=10, height=10, res=350)
+plot_pca(results, colorBy=Sample_Labels, PC1=1, PC2=2)
+#plot_pca(results, colorBy=classes1, PC1=1, PC2=2) 
+
+dev.off()
+
+## Get karyotype measures
+k.Veh <- karyotypeMeasures(files.Veh)
+k.CFI <- karyotypeMeasures(files.CFI)
+## Print the scores in one data.frame
+df <- rbind(Veh = k.Veh$genomewide, CFI = k.CFI$genomewide)
+print(df)
+
+#write into a file
+write.table(df,file="aneu_heter_score_classwise.txt", sep='\t',  quote = F,row.names = T)
+
+# plot aneuploidy vs heterogeniety for both classess
+H_aneu_plot <- plotHeterogeneity(hmms.list = list(Veh=files.Veh, CFI=files.CFI))
+H_aneu_plot 
+
+
+chromosome_wise_df <- as.data.frame(H_aneu_plot$data)
+write.table(chromosome_wise_df,file="chromosome_wise_df_class_wise.txt", sep='\t',  quote = F,row.names = T)
+
+jpeg(file="Aneuplody_heterogeniety_plot.jpeg", units="in", width=10, height=10, res=350)
+#plotHeterogeneity(hmms.list = list(Veh=files.Veh, CFI=files.CFI))
+H_aneu_plot 
+dev.off()
+
+jpeg(file="Group_wise_Aneuplody_heterogeniety_plot1.jpeg", units="in", width=15, height=10, res=350)
+#plotHeterogeneity(hmms.list = list(Veh=files.Veh, CFI=files.CFI))
+H_aneu_plot 
+dev.off()
+
+
+pdf(file="Aneuplody_heterogeniety_plot.pdf",  width=10, height=10)
+H_aneu_plot 
+dev.off()
+
+
+#individual aneu vs heterogeity plot for Veh/control group
+H_aneu_plot_veh_group <- plotHeterogeneity(hmms.list = list(Veh=files.Veh))
+H_aneu_plot_veh_group
+
+jpeg(file="Veh_group_Aneuplody_heterogeniety_plot1.jpeg", units="in", width=10, height=10, res=350)
+#plotHeterogeneity(hmms.list = list(Veh=files.Veh, CFI=files.CFI))
+H_aneu_plot_veh_group
+dev.off()
+
+#individual aneu vs heterogeity plot for test group
+H_aneu_plot_CFI_group <- plotHeterogeneity(hmms.list = list(CFI=files.CFI))
+H_aneu_plot_CFI_group
+H_aneu_plot_CFI_group$data
+
+jpeg(file="CFI_group_Aneuplody_heterogeniety_plot1.jpeg", units="in", width=10, height=10, res=350)
+#plotHeterogeneity(hmms.list = list(Veh=files.Veh, CFI=files.CFI))
+H_aneu_plot_CFI_group
+dev.off()
+
+
+
+#### chromosome-wise aneuploidy /heterogenity calculation for each samples #####
+
+files.CFI <- grep("CFI", files, ignore.case=TRUE, value=TRUE/FALSE)
+files.CFI
+CFI1_1_f <- grep("CFI1_1_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_3_f <- grep("CFI1_3_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_4_f <- grep("CFI1_4_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_5_f <- grep("CFI1_5_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_6_f <- grep("CFI1_6_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_7_f <- grep("CFI1_7_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_8_f <- grep("CFI1_8_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_11_f <- grep("CFI1_11_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_13_f <- grep("CFI1_13_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_14_f <- grep("CFI1_14_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_15_f <- grep("CFI1_15_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_18_f <- grep("CFI1_18_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_21_f <- grep("CFI1_21_", files, ignore.case=TRUE, value=TRUE/FALSE)
+CFI1_22_f <- grep("CFI1_22_", files, ignore.case=TRUE, value=TRUE/FALSE)
+## Get karyotype measures
+k.CFI1_1 <- karyotypeMeasures(CFI1_1_f)
+k.CFI1_3 <- karyotypeMeasures(CFI1_3_f)
+k.CFI1_4 <- karyotypeMeasures(CFI1_4_f)
+k.CFI1_5 <- karyotypeMeasures(CFI1_5_f)
+k.CFI1_6 <- karyotypeMeasures(CFI1_6_f)
+k.CFI1_7 <- karyotypeMeasures(CFI1_7_f)
+k.CFI1_8 <- karyotypeMeasures(CFI1_8_f)
+k.CFI1_11 <- karyotypeMeasures(CFI1_11_f)
+k.CFI1_13 <- karyotypeMeasures(CFI1_13_f)
+k.CFI1_14 <- karyotypeMeasures(CFI1_14_f)
+k.CFI1_15 <- karyotypeMeasures(CFI1_15_f)
+k.CFI1_18 <- karyotypeMeasures(CFI1_18_f)
+k.CFI1_21 <- karyotypeMeasures(CFI1_21_f)
+k.CFI1_22 <- karyotypeMeasures(CFI1_22_f)
+head(k.CFI1_1)
+
+
+
+## Print the scores in one data.frame
+df_CFI <- rbind(CFI_1_sample = k.CFI1_1$genomewide, CFI_3_sample = k.CFI1_3$genomewide, 
+                CFI_4_sample = k.CFI1_4$genomewide, CFI_5_sample = k.CFI1_5$genomewide,
+                CFI_6_sample = k.CFI1_6$genomewide, CFI_7_sample = k.CFI1_7$genomewide,
+                CFI_8_sample = k.CFI1_8$genomewide, CFI_11_sample = k.CFI1_11$genomewide,
+                CFI_13_sample = k.CFI1_13$genomewide, CFI_14_sample = k.CFI1_14$genomewide,
+                CFI_15_sample = k.CFI1_15$genomewide, CFI_18_sample = k.CFI1_18$genomewide,
+                CFI_21_sample = k.CFI1_21$genomewide, CFI_22_sample = k.CFI1_22$genomewide)
+print(df_CFI)
+write.table(df_CFI,file="df_CFI.txt", sep='\t',  quote = F,row.names = T)
+
+#CFI1_1
+#Het_plot_3samples <- plotHeterogeneity(hmms.list = list(CFI1_1=CFI1_1, CFI1_3=CFI1_3, CFI1_5=CFI1_5 ))
+Het_aneu_plot_CFIsamples <- plotHeterogeneity(hmms.list = list(CFI1_1=CFI1_1_f,  CFI1_3=CFI1_3_f, 
+                                                               CFI1_4=CFI1_4_f, CFI1_5=CFI1_5_f, CFI1_6=CFI1_6_f, 
+                                                               CFI1_7=CFI1_7_f,  CFI1_8=CFI1_8_f,CFI1_11=CFI1_11_f,
+                                                               CFI1_13=CFI1_13_f , CFI1_14=CFI1_14_f, CFI1_15=CFI1_15_f,
+                                                               CFI1_18=CFI1_18_f,  CFI1_21=CFI1_21_f, CFI1_22=CFI1_22_f))
+
+Het_aneu_plot_CFIsamples
+chromosome_wise_aneu_CFI <- as.data.frame(Het_aneu_plot_CFIsamples$data)
+write.table(chromosome_wise_aneu_CFI,file="chromosome_wise_aneu_CFI.txt", sep='\t',  quote = F,row.names = T)
+
+
+jpeg(file="Aneup_hetero_plot_CFI_samples.jpeg", units="in", width=20, height=10, res=350)
+Het_aneu_plot_CFIsamples
+dev.off()
+
+##### Veh
+
+files.Veh <- grep("Veh", files, ignore.case=TRUE, value=TRUE/FALSE)
+files.Veh
+
+Veh_1_f <- grep("Veh1_1_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_2_f <- grep("Veh1_2_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_3_f <- grep("Veh1_3_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_4_f <- grep("Veh1_4_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_5_f <- grep("Veh1_5_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_7_f <- grep("Veh1_7_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_8_f <- grep("Veh1_8_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_9_f <- grep("Veh1_9_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_10_f <- grep("Veh1_10_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_12_f <- grep("Veh1_12_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_14_f <- grep("Veh1_14_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_16_f <- grep("Veh1_16_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_18_f <- grep("Veh1_18_", files, ignore.case=TRUE, value=TRUE/FALSE)
+Veh_22_f <- grep("Veh1_22_", files, ignore.case=TRUE, value=TRUE/FALSE)
+## Get karyotype measures
+k.Veh_1 <- karyotypeMeasures(Veh_1_f)
+k.Veh_2 <- karyotypeMeasures(Veh_2_f)
+k.Veh_3 <- karyotypeMeasures(Veh_3_f)
+k.Veh_4 <- karyotypeMeasures(Veh_4_f)
+k.Veh_5 <- karyotypeMeasures(Veh_5_f)
+k.Veh_7 <- karyotypeMeasures(Veh_7_f)
+k.Veh_8 <- karyotypeMeasures(Veh_8_f)
+k.Veh_9 <- karyotypeMeasures(Veh_9_f)
+k.Veh_10 <- karyotypeMeasures(Veh_10_f)
+k.Veh_12 <- karyotypeMeasures(Veh_12_f)
+k.Veh_14 <- karyotypeMeasures(Veh_14_f)
+k.Veh_16 <- karyotypeMeasures(Veh_16_f)
+k.Veh_18 <- karyotypeMeasures(Veh_18_f)
+k.Veh_22 <- karyotypeMeasures(Veh_22_f)
+
+head(k.Veh1_1)
+
+
+
+## Print the scores in one data.frame
+df_veh <- rbind(Veh_1_sample = k.Veh_1$genomewide, Veh_2_sample = k.Veh_2$genomewide, 
+                Veh_3_sample = k.Veh_3$genomewide, Veh_4_sample = k.Veh_4$genomewide, 
+                Veh_5_sample = k.Veh_5$genomewide, Veh_7_sample = k.Veh_7$genomewide,
+                Veh_8_sample = k.Veh_8$genomewide, Veh_9_sample = k.Veh_9$genomewide,
+                Veh_10_sample = k.Veh_10$genomewide, Veh_12_sample = k.Veh_12$genomewide,
+                Veh_14_sample = k.Veh_14$genomewide, Veh_16_sample = k.Veh_16$genomewide,
+                Veh_18_sample = k.Veh_18$genomewide, Veh_22_sample = k.Veh_22$genomewide)
+print(df_veh)
+write.table(df_veh,file="df_veh.txt", sep='\t',  quote = F,row.names = T)
+
+
+
+#Veh1_1
+#Het_plot_3samples <- plotHeterogeneity(hmms.list = list(Veh1_1=Veh1_1, Veh1_3=Veh1_3, Veh1_5=Veh1_5 ))
+Het_aneu_plot_Veh_samples <- plotHeterogeneity(hmms.list = list(Veh_1=Veh_1_f, Veh_2=Veh_2_f, Veh_3=Veh_3_f, 
+                                                                Veh_4=Veh_4_f, Veh_5=Veh_5_f,  Veh_7=Veh_7_f, 
+                                                                Veh_8=Veh_8_f,Veh_9=Veh_9_f, Veh_10=Veh_10_f , 
+                                                                Veh_12=Veh_12_f, Veh_14=Veh_14_f, Veh_16=Veh_16_f, 
+                                                                Veh_18=Veh_18_f, Veh_22=Veh_22_f))
+
+Het_aneu_plot_Veh_samples
+head(Het_aneu_plot_Veh_samples$data)
+chromosome_wise_aneu_veh <- as.data.frame(Het_aneu_plot_Veh_samples$data)
+write.table(chromosome_wise_aneu_veh,file="chromosome_wise_aneu_veh.txt", sep='\t',  quote = F,row.names = T)
+
+jpeg(file="Aneup_hetero_plot_Veh_samples.jpeg", units="in", width=20, height=10, res=350)
+Het_aneu_plot_Veh_samples
+dev.off()
+
+##################################################################################
+
+
+##### Draw Karyograms, profile and histogram plots for each sample  #######
+
+#Karyogram
+jpeg(file="Karyogram_CF1_1.jpeg", units="in", width=20, height=10, res=350)
+plot(files[1], type='karyogram')
+dev.off()
+
+plot(files[2], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_11.jpeg", units="in", width=20, height=10, res=350)
+plot(files[2], type='karyogram')
+dev.off()
+
+plot(files[3], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_13.jpeg", units="in", width=20, height=10, res=350)
+plot(files[3], type='karyogram')
+dev.off()
+
+plot(files[4], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_14.jpeg", units="in", width=20, height=10, res=350)
+plot(files[4], type='karyogram')
+dev.off()
+
+
+plot(files[5], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_15.jpeg", units="in", width=20, height=10, res=350)
+plot(files[5], type='karyogram')
+dev.off()
+
+
+files[6]
+plot(files[6], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_18.jpeg", units="in", width=20, height=10, res=350)
+plot(files[6], type='karyogram')
+dev.off()
+
+
+files[7]
+plot(files[7], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_21.jpeg", units="in", width=20, height=10, res=350)
+plot(files[7], type='karyogram')
+dev.off()
+
+
+files[8]
+plot(files[8], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_22.jpeg", units="in", width=20, height=10, res=350)
+plot(files[8], type='karyogram')
+dev.off()
+
+files[9]
+plot(files[9], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_3.jpeg", units="in", width=20, height=10, res=350)
+plot(files[9], type='karyogram')
+dev.off()
+
+
+files[10]
+plot(files[10], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_4.jpeg", units="in", width=20, height=10, res=350)
+plot(files[10], type='karyogram')
+dev.off()
+
+
+files[11]
+plot(files[11], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_5.jpeg", units="in", width=20, height=10, res=350)
+plot(files[11], type='karyogram')
+dev.off()
+
+
+files[12]
+plot(files[12], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_6.jpeg", units="in", width=20, height=10, res=350)
+plot(files[12], type='karyogram')
+dev.off()
+
+files[13]
+plot(files[13], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_7.jpeg", units="in", width=20, height=10, res=350)
+plot(files[13], type='karyogram')
+dev.off()
+
+files[14]
+plot(files[14], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_CF1_8.jpeg", units="in", width=20, height=10, res=350)
+plot(files[14], type='karyogram')
+dev.off()
+
+files[15]
+plot(files[15], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh1.jpeg", units="in", width=20, height=10, res=350)
+plot(files[15], type='karyogram')
+dev.off()
+
+files[16]
+plot(files[16], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_10.jpeg", units="in", width=20, height=10, res=350)
+plot(files[16], type='karyogram')
+dev.off()
+
+
+files[17]
+plot(files[17], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_12.jpeg", units="in", width=20, height=10, res=350)
+plot(files[17], type='karyogram')
+dev.off()
+
+files[18]
+plot(files[18], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_14.jpeg", units="in", width=20, height=10, res=350)
+plot(files[18], type='karyogram')
+dev.off()
+
+files[19]
+plot(files[19], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh1_16.jpeg", units="in", width=20, height=10, res=350)
+plot(files[19], type='karyogram')
+dev.off()
+
+files[20]
+plot(files[20], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_18.jpeg", units="in", width=20, height=10, res=350)
+plot(files[20], type='karyogram')
+dev.off()
+
+files[21]
+plot(files[21], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_2.jpeg", units="in", width=20, height=10, res=350)
+plot(files[21], type='karyogram')
+dev.off()
+
+files[22]
+plot(files[22], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh22.jpeg", units="in", width=20, height=10, res=350)
+plot(files[22], type='karyogram')
+dev.off()
+
+files[23]
+plot(files[23], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_3.jpeg", units="in", width=20, height=10, res=350)
+plot(files[23], type='karyogram')
+dev.off()
+
+files[24]
+plot(files[24], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_4.jpeg", units="in", width=20, height=10, res=350)
+plot(files[24], type='karyogram')
+dev.off()
+
+
+files[25]
+plot(files[25], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_5.jpeg", units="in", width=20, height=10, res=350)
+plot(files[25], type='karyogram')
+dev.off()
+
+files[26]
+plot(files[26], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_7.jpeg", units="in", width=20, height=10, res=350)
+plot(files[26], type='karyogram')
+dev.off()
+
+
+files[27]
+plot(files[27], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_8.jpeg", units="in", width=20, height=10, res=350)
+plot(files[27], type='karyogram')
+dev.off()
+
+
+files[28]
+plot(files[28], type='karyogram')
+#Karyogram
+jpeg(file="Karyogram_Veh_9.jpeg", units="in", width=20, height=10, res=350)
+plot(files[28], type='karyogram')
+dev.off()
+
+
+
+########## profiles plots
+
+#profile
+jpeg(file="profile_CF1_1.jpeg", units="in", width=20, height=10, res=350)
+plot(files[1], type='profile')
+dev.off()
+
+plot(files[2], type='profile')
+#profile
+jpeg(file="profile_CF1_11.jpeg", units="in", width=20, height=10, res=350)
+plot(files[2], type='profile')
+dev.off()
+
+plot(files[3], type='profile')
+#profile
+jpeg(file="profile_CF1_13.jpeg", units="in", width=20, height=10, res=350)
+plot(files[3], type='profile')
+dev.off()
+
+plot(files[4], type='profile')
+#profile
+jpeg(file="profile_CF1_14.jpeg", units="in", width=20, height=10, res=350)
+plot(files[4], type='profile')
+dev.off()
+
+
+plot(files[5], type='profile')
+#profile
+jpeg(file="profile_CF1_15.jpeg", units="in", width=20, height=10, res=350)
+plot(files[5], type='profile')
+dev.off()
+
+
+files[6]
+plot(files[6], type='profile')
+#profile
+jpeg(file="profile_CF1_18.jpeg", units="in", width=20, height=10, res=350)
+plot(files[6], type='profile')
+dev.off()
+
+
+files[7]
+plot(files[7], type='profile')
+#profile
+jpeg(file="profile_CF1_21.jpeg", units="in", width=20, height=10, res=350)
+plot(files[7], type='profile')
+dev.off()
+
+
+files[8]
+plot(files[8], type='profile')
+#profile
+jpeg(file="profile_CF1_22.jpeg", units="in", width=20, height=10, res=350)
+plot(files[8], type='profile')
+dev.off()
+
+files[9]
+plot(files[9], type='profile')
+#profile
+jpeg(file="profile_CF1_3.jpeg", units="in", width=20, height=10, res=350)
+plot(files[9], type='profile')
+dev.off()
+
+
+files[10]
+plot(files[10], type='profile')
+#profile
+jpeg(file="profile_CF1_4.jpeg", units="in", width=20, height=10, res=350)
+plot(files[10], type='profile')
+dev.off()
+
+
+files[11]
+plot(files[11], type='profile')
+#profile
+jpeg(file="profile_CF1_5.jpeg", units="in", width=20, height=10, res=350)
+plot(files[11], type='profile')
+dev.off()
+
+
+files[12]
+plot(files[12], type='profile')
+#profile
+jpeg(file="profile_CF1_6.jpeg", units="in", width=20, height=10, res=350)
+plot(files[12], type='profile')
+dev.off()
+
+files[13]
+plot(files[13], type='profile')
+#profile
+jpeg(file="profile_CF1_7.jpeg", units="in", width=20, height=10, res=350)
+plot(files[13], type='profile')
+dev.off()
+
+files[14]
+plot(files[14], type='profile')
+#profile
+jpeg(file="profile_CF1_8.jpeg", units="in", width=20, height=10, res=350)
+plot(files[14], type='profile')
+dev.off()
+
+files[15]
+plot(files[15], type='profile')
+#profile
+jpeg(file="profile_Veh1.jpeg", units="in", width=20, height=10, res=350)
+plot(files[15], type='profile')
+dev.off()
+
+files[16]
+plot(files[16], type='profile')
+#profile
+jpeg(file="profile_Veh_10.jpeg", units="in", width=20, height=10, res=350)
+plot(files[16], type='profile')
+dev.off()
+
+
+files[17]
+plot(files[17], type='profile')
+#profile
+jpeg(file="profile_Veh_12.jpeg", units="in", width=20, height=10, res=350)
+plot(files[17], type='profile')
+dev.off()
+
+files[18]
+plot(files[18], type='profile')
+#profile
+jpeg(file="profile_Veh_14.jpeg", units="in", width=20, height=10, res=350)
+plot(files[18], type='profile')
+dev.off()
+
+files[19]
+plot(files[19], type='profile')
+#profile
+jpeg(file="profile_Veh1_16.jpeg", units="in", width=20, height=10, res=350)
+plot(files[19], type='profile')
+dev.off()
+
+files[20]
+plot(files[20], type='profile')
+#profile
+jpeg(file="profile_Veh_18.jpeg", units="in", width=20, height=10, res=350)
+plot(files[20], type='profile')
+dev.off()
+
+files[21]
+plot(files[21], type='profile')
+#profile
+jpeg(file="profile_Veh_2.jpeg", units="in", width=20, height=10, res=350)
+plot(files[21], type='profile')
+dev.off()
+
+files[22]
+plot(files[22], type='profile')
+#profile
+jpeg(file="profile_Veh22.jpeg", units="in", width=20, height=10, res=350)
+plot(files[22], type='profile')
+dev.off()
+
+files[23]
+plot(files[23], type='profile')
+#profile
+jpeg(file="profile_Veh_3.jpeg", units="in", width=20, height=10, res=350)
+plot(files[23], type='profile')
+dev.off()
+
+files[24]
+plot(files[24], type='profile')
+#profile
+jpeg(file="profile_Veh_4.jpeg", units="in", width=20, height=10, res=350)
+plot(files[24], type='profile')
+dev.off()
+
+
+files[25]
+plot(files[25], type='profile')
+#profile
+jpeg(file="profile_Veh_5.jpeg", units="in", width=20, height=10, res=350)
+plot(files[25], type='profile')
+dev.off()
+
+files[26]
+plot(files[26], type='profile')
+#profile
+jpeg(file="profile_Veh_7.jpeg", units="in", width=20, height=10, res=350)
+plot(files[26], type='profile')
+dev.off()
+
+
+files[27]
+plot(files[27], type='profile')
+#profile
+jpeg(file="profile_Veh_8.jpeg", units="in", width=20, height=10, res=350)
+plot(files[27], type='profile')
+dev.off()
+
+
+files[28]
+plot(files[28], type='profile')
+#profile
+jpeg(file="profile_Veh_9.jpeg", units="in", width=20, height=10, res=350)
+plot(files[28], type='profile')
+dev.off()
+
+
+
+
+######## Histograms
+
+#Histogram
+jpeg(file="histogram_CF1_1.jpeg", units="in", width=20, height=10, res=350)
+plot(files[1], type='histogram')
+dev.off()
+
+plot(files[2], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_11.jpeg", units="in", width=20, height=10, res=350)
+plot(files[2], type='histogram')
+dev.off()
+
+plot(files[3], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_13.jpeg", units="in", width=20, height=10, res=350)
+plot(files[3], type='histogram')
+dev.off()
+
+plot(files[4], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_14.jpeg", units="in", width=20, height=10, res=350)
+plot(files[4], type='histogram')
+dev.off()
+
+
+plot(files[5], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_15.jpeg", units="in", width=20, height=10, res=350)
+plot(files[5], type='histogram')
+dev.off()
+
+
+files[6]
+plot(files[6], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_18.jpeg", units="in", width=20, height=10, res=350)
+plot(files[6], type='histogram')
+dev.off()
+
+
+files[7]
+plot(files[7], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_21.jpeg", units="in", width=20, height=10, res=350)
+plot(files[7], type='histogram')
+dev.off()
+
+
+files[8]
+plot(files[8], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_22.jpeg", units="in", width=20, height=10, res=350)
+plot(files[8], type='histogram')
+dev.off()
+
+files[9]
+plot(files[9], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_3.jpeg", units="in", width=20, height=10, res=350)
+plot(files[9], type='histogram')
+dev.off()
+
+
+files[10]
+plot(files[10], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_4.jpeg", units="in", width=20, height=10, res=350)
+plot(files[10], type='histogram')
+dev.off()
+
+
+files[11]
+plot(files[11], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_5.jpeg", units="in", width=20, height=10, res=350)
+plot(files[11], type='histogram')
+dev.off()
+
+
+files[12]
+plot(files[12], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_6.jpeg", units="in", width=20, height=10, res=350)
+plot(files[12], type='histogram')
+dev.off()
+
+files[13]
+plot(files[13], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_7.jpeg", units="in", width=20, height=10, res=350)
+plot(files[13], type='histogram')
+dev.off()
+
+files[14]
+plot(files[14], type='histogram')
+#Histogram
+jpeg(file="histogram_CF1_8.jpeg", units="in", width=20, height=10, res=350)
+plot(files[14], type='histogram')
+dev.off()
+
+files[15]
+plot(files[15], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh1.jpeg", units="in", width=20, height=10, res=350)
+plot(files[15], type='histogram')
+dev.off()
+
+files[16]
+plot(files[16], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_10.jpeg", units="in", width=20, height=10, res=350)
+plot(files[16], type='histogram')
+dev.off()
+
+
+files[17]
+plot(files[17], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_12.jpeg", units="in", width=20, height=10, res=350)
+plot(files[17], type='histogram')
+dev.off()
+
+files[18]
+plot(files[18], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_14.jpeg", units="in", width=20, height=10, res=350)
+plot(files[18], type='histogram')
+dev.off()
+
+files[19]
+plot(files[19], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh1_16.jpeg", units="in", width=20, height=10, res=350)
+plot(files[19], type='histogram')
+dev.off()
+
+files[20]
+plot(files[20], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_18.jpeg", units="in", width=20, height=10, res=350)
+plot(files[20], type='histogram')
+dev.off()
+
+files[21]
+plot(files[21], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_2.jpeg", units="in", width=20, height=10, res=350)
+plot(files[21], type='histogram')
+dev.off()
+
+files[22]
+plot(files[22], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh22.jpeg", units="in", width=20, height=10, res=350)
+plot(files[22], type='histogram')
+dev.off()
+
+files[23]
+plot(files[23], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_3.jpeg", units="in", width=20, height=10, res=350)
+plot(files[23], type='histogram')
+dev.off()
+
+files[24]
+plot(files[24], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_4.jpeg", units="in", width=20, height=10, res=350)
+plot(files[24], type='histogram')
+dev.off()
+
+
+files[25]
+plot(files[25], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_5.jpeg", units="in", width=20, height=10, res=350)
+plot(files[25], type='histogram')
+dev.off()
+
+files[26]
+plot(files[26], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_7.jpeg", units="in", width=20, height=10, res=350)
+plot(files[26], type='histogram')
+dev.off()
+
+
+files[27]
+plot(files[27], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_8.jpeg", units="in", width=20, height=10, res=350)
+plot(files[27], type='histogram')
+dev.off()
+
+
+files[28]
+plot(files[28], type='histogram')
+#Histogram
+jpeg(file="histogram_Veh_9.jpeg", units="in", width=20, height=10, res=350)
+plot(files[28], type='histogram')
+dev.off()
+
+
+
+
